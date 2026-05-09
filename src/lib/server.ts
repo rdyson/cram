@@ -1,9 +1,23 @@
 import { supabaseAdmin, getUserFromRequest } from './supabase';
 import { SAA_TOPICS } from './topics';
 
+export function allowedEmails() {
+  return (process.env.ALLOWED_EMAILS ?? '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAllowedEmail(email?: string | null) {
+  const allowlist = allowedEmails();
+  if (!allowlist.length) return true;
+  return Boolean(email && allowlist.includes(email.toLowerCase()));
+}
+
 export async function requireUser(request: Request) {
   const user = await getUserFromRequest(request);
   if (!user) return { error: Response.json({ error: 'Unauthorized' }, { status: 401 }) } as const;
+  if (!isAllowedEmail(user.email)) return { error: Response.json({ error: 'Email not allowed' }, { status: 403 }) } as const;
   return { user } as const;
 }
 

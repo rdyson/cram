@@ -74,7 +74,15 @@ export default function Home() {
     return () => sub.subscription.unsubscribe();
   }, [supabase]);
 
-  useEffect(() => { if (user) refresh().catch((e) => setMessage(e.message)); }, [user]);
+  useEffect(() => {
+    if (user) {
+      refresh().catch((e) => {
+        const text = e instanceof Error ? e.message : 'Access failed';
+        setMessage(text === 'Email not allowed' ? 'This app is private. Your email is not on the allowlist.' : text);
+        if (text === 'Email not allowed') supabase.auth.signOut();
+      });
+    }
+  }, [user]);
 
   async function signIn(up: boolean) {
     setBusy(true); setMessage('');
@@ -83,6 +91,21 @@ export default function Home() {
         ? await supabase.auth.signUp({ email, password })
         : await supabase.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
+      const signedInEmail = result.data.user?.email?.toLowerCase();
+      if (signedInEmail) {
+        try {
+          await api('/api/bootstrap', { method: 'POST' });
+        } catch (accessError) {
+          const text = accessError instanceof Error ? accessError.message : 'Access failed';
+          if (text === 'Email not allowed') {
+            await supabase.auth.signOut();
+            setMessage('This app is private. Your email is not on the allowlist.');
+            setBusy(false);
+            return;
+          }
+          throw accessError;
+        }
+      }
       setMessage(up ? 'Account created. If email confirmation is enabled, check your inbox.' : 'Signed in.');
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Auth failed'); }
     setBusy(false);
