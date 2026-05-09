@@ -84,12 +84,29 @@ export default function Home() {
     }
   }, [user]);
 
+  async function checkAllowedEmail(candidate: string) {
+    const response = await fetch('/api/auth/allowlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: candidate.trim().toLowerCase() })
+    });
+    const data = await response.json();
+    return Boolean(data.allowed);
+  }
+
   async function signIn(up: boolean) {
     setBusy(true); setMessage('');
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const allowed = await checkAllowedEmail(normalizedEmail);
+      if (!allowed) {
+        setMessage('This app is private. Your email is not on the allowlist.');
+        setBusy(false);
+        return;
+      }
       const result = up
-        ? await supabase.auth.signUp({ email, password })
-        : await supabase.auth.signInWithPassword({ email, password });
+        ? await supabase.auth.signUp({ email: normalizedEmail, password })
+        : await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (result.error) throw result.error;
       const signedInEmail = result.data.user?.email?.toLowerCase();
       if (signedInEmail) {
