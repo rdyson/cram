@@ -98,7 +98,17 @@ export async function POST(request: Request) {
       return `Excerpt ${i + 1} (${asset?.type ?? 'unknown'}: ${asset?.filename ?? 'unknown file'}):\n${e.text}`;
     }).join('\n\n').slice(0, 24000);
     const screenshotCount = excerpts.filter((e) => e.uploaded_assets?.type === 'screenshot').length;
-    const prompt = `You create AWS SAA-C03 study material. Use the learner's notes/screenshots as exposure, not proof of mastery. Generate exactly 5 flashcards and exactly 5 scenario questions. Scenario questions must have four choices, one best answer, explanation, and why each wrong answer is wrong. Prioritize screenshot excerpts when present. This generation context includes ${screenshotCount} screenshot excerpts and ${excerpts.length - screenshotCount} markdown excerpts. Use these topic choices only:\n\n${topicPrompt()}\n\nLearner source excerpts:\n${sourceText}\n\nReturn JSON only: {"items":[...]}. Each item fields: type, topic, domain, difficulty, prompt, answer for flashcard, answer_choices for scenario, correct_answer_key for scenario, explanation, why_wrong_answers_are_wrong for scenario.`;
+    const prompt = `You create AWS SAA-C03 study material. Use the learner's notes/screenshots as exposure, not proof of mastery. Generate exactly 5 flashcards and exactly 5 scenario questions.
+
+Important grounding rules:
+- This generation context includes ${screenshotCount} screenshot excerpts and ${excerpts.length - screenshotCount} markdown excerpts.
+- If screenshot excerpts are present, ground every flashcard and scenario question in concrete services or concepts visible in those screenshot excerpts.
+- Do not default to generic IAM/security questions unless the source excerpts actually discuss IAM/security.
+- Prefer the most specific services, comparisons, and architecture tradeoffs visible in the source excerpts.
+- Scenario questions must test SAA-C03 architecture tradeoffs, not trivia.
+- Scenario questions must have four choices, one best answer, explanation, and why each wrong answer is wrong.
+
+Use these topic choices only:\n\n${topicPrompt()}\n\nLearner source excerpts:\n${sourceText}\n\nReturn JSON only: {"items":[...]}. Each item fields: type, topic, domain, difficulty, prompt, answer for flashcard, answer_choices for scenario, correct_answer_key for scenario, explanation, why_wrong_answers_are_wrong for scenario.`;
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await openai.chat.completions.create({
@@ -122,6 +132,7 @@ export async function POST(request: Request) {
 
     const findTopic = (name: string) => topics.find((topic) => topic.name.toLowerCase() === name.toLowerCase()) ?? topics.find((topic) => name.toLowerCase().includes(topic.name.toLowerCase().slice(0, 8))) ?? topics[0];
     const hasScreenshotSource = (assets ?? []).some((asset) => asset.type === 'screenshot');
+    const primarySource = hasScreenshotSource ? 'screenshot' : 'markdown_notes';
     const rows = batch.items.map((item) => {
       const topic = findTopic(item.topic);
       return {
@@ -129,7 +140,7 @@ export async function POST(request: Request) {
         exam_domain_id: topic.domain_id,
         exam_topic_id: topic.id,
         type: item.type,
-        source: item.type === 'flashcard' ? (hasScreenshotSource ? 'screenshot' : 'markdown_notes') : 'blueprint_gap',
+        source: primarySource,
         difficulty: item.difficulty,
         prompt: item.prompt,
         answer: item.answer ?? null,
