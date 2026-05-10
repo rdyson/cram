@@ -148,17 +148,26 @@ export default function Home() {
     setBusy(false);
   }
 
-  async function upload(file: File | null) {
-    if (!file || !state.activeDeck) return;
-    setBusy(true); setMessage('');
-    try {
-      const form = new FormData();
-      form.set('deckId', state.activeDeck.id);
-      form.set('file', file);
-      await api('/api/upload', { method: 'POST', body: form });
-      await refresh(state.activeDeck.id);
-      setMessage('Markdown uploaded and chunked. Generate study items next.');
-    } catch (e) { setMessage(e instanceof Error ? e.message : 'Upload failed'); }
+  async function upload(files: FileList | null) {
+    if (!files?.length || !state.activeDeck) return;
+    setBusy(true); setMessage(`Uploading 0/${files.length} files...`);
+    let succeeded = 0;
+    const failures: string[] = [];
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
+      try {
+        setMessage(`Uploading ${index + 1}/${files.length}: ${file.name}`);
+        const form = new FormData();
+        form.set('deckId', state.activeDeck.id);
+        form.set('file', file);
+        await api('/api/upload', { method: 'POST', body: form });
+        succeeded += 1;
+      } catch (e) {
+        failures.push(`${file.name}: ${e instanceof Error ? e.message : 'Upload failed'}`);
+      }
+    }
+    await refresh(state.activeDeck.id);
+    setMessage(failures.length ? `Uploaded ${succeeded}/${files.length}. Failed: ${failures.join('; ')}` : `Uploaded ${succeeded}/${files.length} files. Generate study items next.`);
     setBusy(false);
   }
 
@@ -248,8 +257,8 @@ export default function Home() {
 
       <div className="card">
         <h2>2. Upload notes or screenshots</h2>
-        <p className="muted">Your notes tell cram what you have seen. Your answers tell it what you know. PNG/JPG screenshots are OCR’d with OpenAI vision.</p>
-        <input type="file" accept=".md,.markdown,.png,.jpg,.jpeg,image/png,image/jpeg" disabled={!state.activeDeck || busy} onChange={(e) => upload(e.target.files?.[0] ?? null)} />
+        <p className="muted">Your notes tell cram what you have seen. Your answers tell it what you know. Select multiple PNG/JPG screenshots to batch OCR them with OpenAI vision.</p>
+        <input type="file" multiple accept=".md,.markdown,.png,.jpg,.jpeg,image/png,image/jpeg" disabled={!state.activeDeck || busy} onChange={(e) => upload(e.target.files)} />
         <div style={{ marginTop: 12 }}>{state.assets.map((asset) => <span className="pill" key={asset.id}>{asset.filename} · {asset.status}</span>)}</div>
       </div>
 
