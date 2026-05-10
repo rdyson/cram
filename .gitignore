@@ -8,3 +8,6 @@ out/
 coverage/
 
 tsconfig.tsbuildinfo
+.gstack/
+
+supabase/.temp/
