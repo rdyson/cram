@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { assertDeckOwner, requireUser } from '@/lib/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { topicPrompt } from '@/lib/topics';
-import { validateGeneratedBatch } from '@/lib/generation';
+import { validateGeneratedBatch, validationSummary } from '@/lib/generation';
 
 function scoreExcerptForTopic(text: string, topic: { name: string; services: string[] | null; concepts: string[] | null }) {
   const lower = text.toLowerCase();
@@ -16,8 +16,14 @@ async function repair(openai: OpenAI, raw: string, error: unknown) {
     model: 'gpt-4o-mini',
     temperature: 0,
     messages: [
-      { role: 'system', content: 'Repair this JSON so it matches the requested schema. Return JSON only.' },
-      { role: 'user', content: `Validation error:\n${String(error)}\n\nOriginal output:\n${raw}` }
+      {
+        role: 'system',
+        content: 'Repair generated SAA-C03 study-item JSON. Return JSON only. Do not remove items unless impossible to repair.'
+      },
+      {
+        role: 'user',
+        content: `Validation errors:\n${validationSummary(error)}\n\nRequired shape:\n{ "items": [ { "type": "flashcard" | "scenario_question", "topic": string, "domain": string, "difficulty": "easy" | "medium" | "hard", "prompt": string, "answer": string for flashcards, "answer_choices": [{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}] for scenario questions, "correct_answer_key": "A" | "B" | "C" | "D", "explanation": string, "why_wrong_answers_are_wrong": { "A": string, "B": string, "C": string, "D": string except omit the correct key } } ] }\n\nFor every scenario question, add a specific explanation for every wrong answer key.\n\nOriginal output:\n${raw}`
+      }
     ]
   });
   return response.choices[0]?.message.content ?? '';
@@ -123,7 +129,8 @@ export async function POST(request: Request) {
     await supabase.from('generation_jobs').update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', jobId);
     return Response.json({ jobId, items });
   } catch (error) {
-    if (jobId) await supabase.from('generation_jobs').update({ status: 'failed', error_message: error instanceof Error ? error.message : 'Generation failed', updated_at: new Date().toISOString() }).eq('id', jobId);
-    return Response.json({ error: error instanceof Error ? error.message : 'Generation failed' }, { status: 500 });
+    const message = validationSummary(error) || 'Generation failed';
+    if (jobId) await supabase.from('generation_jobs').update({ status: 'failed', error_message: message, updated_at: new Date().toISOString() }).eq('id', jobId);
+    return Response.json({ error: message }, { status: 500 });
   }
 }
