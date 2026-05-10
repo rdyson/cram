@@ -7,10 +7,15 @@ export const AnswerChoiceSchema = z.object({
   text: z.string().min(3)
 });
 
+const OptionalModelTextSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim().length < 3 ? undefined : value),
+  z.string().min(3).optional()
+);
+
 export const GeneratedItemSchema = z.object({
   type: z.enum(['flashcard', 'scenario_question']),
   topic: z.string().min(3),
-  domain: z.string().min(3),
+  domain: OptionalModelTextSchema,
   difficulty: z.enum(['easy', 'medium', 'hard']),
   prompt: z.string().min(8),
   answer: z.string().optional(),

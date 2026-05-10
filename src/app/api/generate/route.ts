@@ -22,7 +22,7 @@ async function repair(openai: OpenAI, raw: string, error: unknown) {
       },
       {
         role: 'user',
-        content: `Validation errors:\n${validationSummary(error)}\n\nRequired shape:\n{ "items": [ { "type": "flashcard" | "scenario_question", "topic": string, "domain": string, "difficulty": "easy" | "medium" | "hard", "prompt": string, "answer": string for flashcards, "answer_choices": [{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}] for scenario questions, "correct_answer_key": "A" | "B" | "C" | "D", "explanation": string, "why_wrong_answers_are_wrong": { "A": string, "B": string, "C": string, "D": string except omit the correct key } } ] }\n\nFor every scenario question, add a specific explanation for every wrong answer key.\n\nOriginal output:\n${raw}`
+        content: `Validation errors:\n${validationSummary(error)}\n\nRequired shape:\n{ "items": [ { "type": "flashcard" | "scenario_question", "topic": string, "domain": optional string, "difficulty": "easy" | "medium" | "hard", "prompt": string, "answer": string for flashcards, "answer_choices": [{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}] for scenario questions, "correct_answer_key": "A" | "B" | "C" | "D", "explanation": string, "why_wrong_answers_are_wrong": { "A": string, "B": string, "C": string, "D": string except omit the correct key } } ] }\n\nFor every scenario question, add a specific explanation for every wrong answer key.\n\nOriginal output:\n${raw}`
       }
     ]
   });
@@ -108,7 +108,7 @@ Important grounding rules:
 - Scenario questions must test SAA-C03 architecture tradeoffs, not trivia.
 - Scenario questions must have four choices, one best answer, explanation, and why each wrong answer is wrong.
 
-Use these topic choices only:\n\n${topicPrompt()}\n\nLearner source excerpts:\n${sourceText}\n\nReturn JSON only: {"items":[...]}. Each item fields: type, topic, domain, difficulty, prompt, answer for flashcard, answer_choices for scenario, correct_answer_key for scenario, explanation, why_wrong_answers_are_wrong for scenario.`;
+Use these topic choices only:\n\n${topicPrompt()}\n\nLearner source excerpts:\n${sourceText}\n\nReturn JSON only: {"items":[...]}. Each item fields: type, topic, optional domain, difficulty, prompt, answer for flashcard, answer_choices for scenario, correct_answer_key for scenario, explanation, why_wrong_answers_are_wrong for scenario.`;
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await openai.chat.completions.create({

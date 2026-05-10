@@ -51,6 +51,21 @@ describe('generated item validation', () => {
     expect(batch.items[0].why_wrong_answers_are_wrong?.D).toContain('not the best fit');
   });
 
+  it('does not fail a batch for a short model-generated domain', () => {
+    const batch = validateGeneratedBatch(JSON.stringify({
+      items: [{
+        type: 'flashcard',
+        domain: 'x',
+        topic: 'Amazon S3',
+        difficulty: 'easy',
+        prompt: 'What storage service provides object storage in AWS?',
+        answer: 'Amazon S3 provides object storage for buckets and objects.',
+        explanation: 'S3 is the AWS object storage service commonly tested on SAA-C03.'
+      }]
+    }));
+    expect(batch.items[0].domain).toBeUndefined();
+  });
+
   it('summarizes validation errors for display', () => {
     try {
       validateGeneratedBatch('{"items":[]}');
