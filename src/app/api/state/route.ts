@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const supabase = supabaseAdmin();
     const { data: decks } = await supabase.from('study_decks').select('*').eq('owner_user_id', auth.user.id).order('created_at', { ascending: false });
     const activeDeckId = deckId || decks?.[0]?.id || null;
-    if (!activeDeckId) return Response.json({ decks: decks ?? [], activeDeck: null, assets: [], items: [], attempts: [], feedback: [], dashboard: [] });
+    if (!activeDeckId) return Response.json({ decks: decks ?? [], activeDeck: null, assets: [], items: [], attempts: [], feedback: [], jobs: [], dashboard: [] });
     const activeDeck = decks?.find((deck) => deck.id === activeDeckId) ?? null;
     if (!activeDeck) return Response.json({ error: 'Deck not found' }, { status: 404 });
 

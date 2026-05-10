@@ -59,7 +59,17 @@ export default function Home() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? 'Request failed');
-    return data;
+    return {
+      ...emptyState,
+      ...data,
+      decks: data.decks ?? [],
+      assets: data.assets ?? [],
+      items: data.items ?? [],
+      attempts: data.attempts ?? [],
+      feedback: data.feedback ?? [],
+      jobs: data.jobs ?? [],
+      dashboard: data.dashboard ?? []
+    };
   }
 
   async function refresh(deckId?: string) {
