@@ -15,6 +15,8 @@ type StudyItem = {
   explanation: string;
   why_wrong_answers_are_wrong?: Record<string, string> | null;
   difficulty: string;
+  source?: string;
+  created_at?: string;
   exam_topics?: { name: string; exam_domains?: { name: string } };
 };
 type DashboardRow = { topic: string; domain: string; coverageScore: number; masteryScore: number; attempts: number; correct: number; diagnosis: string };
@@ -280,7 +282,7 @@ export default function Home() {
       <h2>Practice</h2>
       {!state.items.length && <p className="muted">No study items yet.</p>}
       {state.items.map((item) => <div className="item" key={item.id}>
-        <div className="row"><span className="pill">{item.type}</span><span className="pill">{item.exam_topics?.exam_domains?.name}</span><span className="pill">{item.exam_topics?.name}</span><span className="pill">{item.difficulty}</span></div>
+        <div className="row"><span className="pill">{item.type}</span><span className="pill">source: {item.source}</span><span className="pill">{item.exam_topics?.exam_domains?.name}</span><span className="pill">{item.exam_topics?.name}</span><span className="pill">{item.difficulty}</span>{item.created_at && <span className="pill">generated {new Date(item.created_at).toLocaleTimeString()}</span>}</div>
         <h3>{item.prompt}</h3>
         {item.type === 'flashcard' ? <details><summary>Reveal answer</summary><p>{item.answer}</p><p className="muted">{item.explanation}</p></details> : <div>{item.answer_choices?.map((choice) => <button key={choice.key} className={`choice ${selected[item.id] === choice.key ? 'selected' : ''}`} onClick={() => setSelected((prev) => ({ ...prev, [item.id]: choice.key }))}>{choice.key}. {choice.text}</button>)}</div>}
         <div className="row" style={{ marginTop: 12 }}>

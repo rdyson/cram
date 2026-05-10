@@ -52,9 +52,21 @@ export async function POST(request: Request) {
     if (jobError) throw jobError;
     jobId = job.id;
 
-    const { data: excerpts, error: excerptsError } = await supabase.from('source_excerpts').select('*').eq('deck_id', deckId).limit(24);
+    const { data: allExcerpts, error: excerptsError } = await supabase
+      .from('source_excerpts')
+      .select('*, uploaded_assets(filename,type,created_at)')
+      .eq('deck_id', deckId);
     if (excerptsError) throw excerptsError;
-    if (!excerpts?.length) throw new Error('Upload Markdown before generating study items.');
+    if (!allExcerpts?.length) throw new Error('Upload notes or screenshots before generating study items.');
+
+    const excerpts = allExcerpts
+      .sort((a, b) => {
+        const aType = a.uploaded_assets?.type === 'screenshot' ? 0 : 1;
+        const bType = b.uploaded_assets?.type === 'screenshot' ? 0 : 1;
+        if (aType !== bType) return aType - bType;
+        return new Date(b.uploaded_assets?.created_at ?? b.created_at).getTime() - new Date(a.uploaded_assets?.created_at ?? a.created_at).getTime();
+      })
+      .slice(0, 48);
 
     const { data: topics, error: topicsError } = await supabase.from('exam_topics').select('*, exam_domains(*)').limit(50);
     if (topicsError) throw topicsError;
@@ -81,8 +93,12 @@ export async function POST(request: Request) {
 
     await supabase.from('generation_jobs').update({ stage: 'generating', updated_at: new Date().toISOString() }).eq('id', jobId);
 
-    const sourceText = excerpts.map((e, i) => `Excerpt ${i + 1}:\n${e.text}`).join('\n\n').slice(0, 14000);
-    const prompt = `You create AWS SAA-C03 study material. Use the learner's notes as exposure, not proof of mastery. Generate exactly 5 flashcards and exactly 5 scenario questions. Scenario questions must have four choices, one best answer, explanation, and why each wrong answer is wrong. Use these topic choices only:\n\n${topicPrompt()}\n\nLearner notes:\n${sourceText}\n\nReturn JSON only: {"items":[...]}. Each item fields: type, topic, domain, difficulty, prompt, answer for flashcard, answer_choices for scenario, correct_answer_key for scenario, explanation, why_wrong_answers_are_wrong for scenario.`;
+    const sourceText = excerpts.map((e, i) => {
+      const asset = e.uploaded_assets;
+      return `Excerpt ${i + 1} (${asset?.type ?? 'unknown'}: ${asset?.filename ?? 'unknown file'}):\n${e.text}`;
+    }).join('\n\n').slice(0, 24000);
+    const screenshotCount = excerpts.filter((e) => e.uploaded_assets?.type === 'screenshot').length;
+    const prompt = `You create AWS SAA-C03 study material. Use the learner's notes/screenshots as exposure, not proof of mastery. Generate exactly 5 flashcards and exactly 5 scenario questions. Scenario questions must have four choices, one best answer, explanation, and why each wrong answer is wrong. Prioritize screenshot excerpts when present. This generation context includes ${screenshotCount} screenshot excerpts and ${excerpts.length - screenshotCount} markdown excerpts. Use these topic choices only:\n\n${topicPrompt()}\n\nLearner source excerpts:\n${sourceText}\n\nReturn JSON only: {"items":[...]}. Each item fields: type, topic, domain, difficulty, prompt, answer for flashcard, answer_choices for scenario, correct_answer_key for scenario, explanation, why_wrong_answers_are_wrong for scenario.`;
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await openai.chat.completions.create({
