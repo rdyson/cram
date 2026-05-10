@@ -46,6 +46,7 @@ export default function Home() {
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [confidence, setConfidence] = useState<Record<string, number>>({});
   const [results, setResults] = useState<Record<string, { isCorrect: boolean; explanation: string; why?: Record<string, string> | null }>>({});
+  const [generateMode, setGenerateMode] = useState<'append' | 'replace'>('append');
   const [startedAt, setStartedAt] = useState(Date.now());
 
   async function token() {
@@ -177,9 +178,9 @@ export default function Home() {
     if (!state.activeDeck) return;
     setBusy(true); setMessage('');
     try {
-      await api('/api/generate', { method: 'POST', body: JSON.stringify({ deckId: state.activeDeck.id }) });
+      await api('/api/generate', { method: 'POST', body: JSON.stringify({ deckId: state.activeDeck.id, mode: generateMode }) });
       await refresh(state.activeDeck.id);
-      setMessage('Generated study items. Start practicing.');
+      setMessage(generateMode === 'append' ? 'Added 10 new study items. Keep practicing.' : 'Replaced study items. Start practicing.');
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Generation failed'); }
     setBusy(false);
   }
@@ -266,8 +267,10 @@ export default function Home() {
 
       <div className="card">
         <h2>3. Generate</h2>
-        <p className="muted">Creates 5 flashcards and 5 scenario questions with validation and repair.</p>
-        <button disabled={!state.activeDeck || !state.assets.length || busy} onClick={generate}>Generate study items</button>
+        <p className="muted">Creates 5 flashcards and 5 scenario questions with validation and repair. Append keeps your good items. Replace starts over.</p>
+        <label className="choice"><input type="radio" name="generateMode" checked={generateMode === 'append'} onChange={() => setGenerateMode('append')} /> Add more items</label>
+        <label className="choice"><input type="radio" name="generateMode" checked={generateMode === 'replace'} onChange={() => setGenerateMode('replace')} /> Replace current items</label>
+        <button disabled={!state.activeDeck || !state.assets.length || busy} onClick={generate}>{generateMode === 'append' ? 'Add more study items' : 'Replace study items'}</button>
         <div style={{ marginTop: 12 }}>{state.jobs.map((job) => <div className="pill" key={job.id}>{job.status} · {job.stage}{job.error_message ? ` · ${job.error_message}` : ''}</div>)}</div>
       </div>
     </section>
@@ -279,7 +282,7 @@ export default function Home() {
     </section>
 
     <section className="card" style={{ marginTop: 18 }}>
-      <h2>Practice</h2>
+      <h2>Practice {state.items.length ? `(${state.items.length} active items)` : ''}</h2>
       {!state.items.length && <p className="muted">No study items yet.</p>}
       {state.items.map((item) => <div className="item" key={item.id}>
         <div className="row"><span className="pill">{item.type}</span><span className="pill">source: {item.source}</span><span className="pill">{item.exam_topics?.exam_domains?.name}</span><span className="pill">{item.exam_topics?.name}</span><span className="pill">{item.difficulty}</span>{item.created_at && <span className="pill">generated {new Date(item.created_at).toLocaleTimeString()}</span>}</div>

@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       supabase.from('uploaded_assets').select('*').eq('deck_id', activeDeckId).order('created_at', { ascending: false }),
       supabase.from('source_excerpts').select('*').eq('deck_id', activeDeckId),
       supabase.from('source_excerpt_topics').select('*, exam_topics(name, exam_domains(name))'),
-      supabase.from('study_items').select('*, exam_topics(name, exam_domains(name))').eq('deck_id', activeDeckId).neq('status', 'hidden').order('created_at', { ascending: true }),
+      supabase.from('study_items').select('*, exam_topics(name, exam_domains(name))').eq('deck_id', activeDeckId).neq('status', 'hidden').order('created_at', { ascending: false }),
       supabase.from('practice_attempts').select('*').eq('deck_id', activeDeckId).eq('user_id', auth.user.id),
       supabase.from('study_item_feedback').select('*').eq('deck_id', activeDeckId).eq('user_id', auth.user.id),
       supabase.from('generation_jobs').select('*').eq('deck_id', activeDeckId).order('created_at', { ascending: false }).limit(5)

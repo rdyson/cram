@@ -35,8 +35,9 @@ export async function POST(request: Request) {
   const supabase = supabaseAdmin();
   let jobId: string | null = null;
   try {
-    const { deckId } = await request.json();
+    const { deckId, mode = 'append' } = await request.json();
     if (!deckId) return Response.json({ error: 'deckId is required' }, { status: 400 });
+    if (!['append', 'replace'].includes(mode)) return Response.json({ error: 'mode must be append or replace' }, { status: 400 });
     await assertDeckOwner(deckId, auth.user.id);
 
     const { data: assets, error: assetsError } = await supabase.from('uploaded_assets').select('id,type').eq('deck_id', deckId).eq('status', 'processed');
@@ -93,11 +94,24 @@ export async function POST(request: Request) {
 
     await supabase.from('generation_jobs').update({ stage: 'generating', updated_at: new Date().toISOString() }).eq('id', jobId);
 
+    const { data: existingItems, error: existingItemsError } = await supabase
+      .from('study_items')
+      .select('prompt,type,source,created_at')
+      .eq('deck_id', deckId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(80);
+    if (existingItemsError) throw existingItemsError;
+
     const sourceText = excerpts.map((e, i) => {
       const asset = e.uploaded_assets;
       return `Excerpt ${i + 1} (${asset?.type ?? 'unknown'}: ${asset?.filename ?? 'unknown file'}):\n${e.text}`;
     }).join('\n\n').slice(0, 24000);
     const screenshotCount = excerpts.filter((e) => e.uploaded_assets?.type === 'screenshot').length;
+    const existingPromptText = (existingItems ?? [])
+      .map((item, i) => `${i + 1}. [${item.type}, ${item.source}] ${item.prompt}`)
+      .join('\n')
+      .slice(0, 8000);
     const prompt = `You create AWS SAA-C03 study material. Use the learner's notes/screenshots as exposure, not proof of mastery. Generate exactly 5 flashcards and exactly 5 scenario questions.
 
 Important grounding rules:
@@ -107,6 +121,9 @@ Important grounding rules:
 - Prefer the most specific services, comparisons, and architecture tradeoffs visible in the source excerpts.
 - Scenario questions must test SAA-C03 architecture tradeoffs, not trivia.
 - Scenario questions must have four choices, one best answer, explanation, and why each wrong answer is wrong.
+- Do not duplicate existing study item prompts. Generate new angles, services, constraints, and distractors.
+
+Existing study items to avoid duplicating:\n${existingPromptText || 'None yet.'}
 
 Use these topic choices only:\n\n${topicPrompt()}\n\nLearner source excerpts:\n${sourceText}\n\nReturn JSON only: {"items":[...]}. Each item fields: type, topic, optional domain, difficulty, prompt, answer for flashcard, answer_choices for scenario, correct_answer_key for scenario, explanation, why_wrong_answers_are_wrong for scenario.`;
 
@@ -150,7 +167,9 @@ Use these topic choices only:\n\n${topicPrompt()}\n\nLearner source excerpts:\n$
         why_wrong_answers_are_wrong: item.why_wrong_answers_are_wrong ?? null
       };
     });
-    await supabase.from('study_items').delete().eq('deck_id', deckId);
+    if (mode === 'replace') {
+      await supabase.from('study_items').delete().eq('deck_id', deckId);
+    }
     const { data: items, error: insertError } = await supabase.from('study_items').insert(rows).select('*');
     if (insertError) throw insertError;
     await supabase.from('generation_jobs').update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', jobId);
