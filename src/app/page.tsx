@@ -247,9 +247,9 @@ export default function Home() {
       </div>
 
       <div className="card">
-        <h2>2. Upload Markdown</h2>
-        <p className="muted">Your notes tell cram what you have seen. Your answers tell it what you know.</p>
-        <input type="file" accept=".md,.markdown" disabled={!state.activeDeck || busy} onChange={(e) => upload(e.target.files?.[0] ?? null)} />
+        <h2>2. Upload notes or screenshots</h2>
+        <p className="muted">Your notes tell cram what you have seen. Your answers tell it what you know. PNG/JPG screenshots are OCR’d with OpenAI vision.</p>
+        <input type="file" accept=".md,.markdown,.png,.jpg,.jpeg,image/png,image/jpeg" disabled={!state.activeDeck || busy} onChange={(e) => upload(e.target.files?.[0] ?? null)} />
         <div style={{ marginTop: 12 }}>{state.assets.map((asset) => <span className="pill" key={asset.id}>{asset.filename} · {asset.status}</span>)}</div>
       </div>
 

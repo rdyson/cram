@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     if (!deckId) return Response.json({ error: 'deckId is required' }, { status: 400 });
     await assertDeckOwner(deckId, auth.user.id);
 
-    const { data: assets, error: assetsError } = await supabase.from('uploaded_assets').select('id').eq('deck_id', deckId).eq('status', 'processed');
+    const { data: assets, error: assetsError } = await supabase.from('uploaded_assets').select('id,type').eq('deck_id', deckId).eq('status', 'processed');
     if (assetsError) throw assetsError;
 
     const { data: job, error: jobError } = await supabase.from('generation_jobs').insert({
@@ -99,6 +99,7 @@ export async function POST(request: Request) {
     await supabase.from('generation_jobs').update({ stage: 'saving', updated_at: new Date().toISOString() }).eq('id', jobId);
 
     const findTopic = (name: string) => topics.find((topic) => topic.name.toLowerCase() === name.toLowerCase()) ?? topics.find((topic) => name.toLowerCase().includes(topic.name.toLowerCase().slice(0, 8))) ?? topics[0];
+    const hasScreenshotSource = (assets ?? []).some((asset) => asset.type === 'screenshot');
     const rows = batch.items.map((item) => {
       const topic = findTopic(item.topic);
       return {
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
         exam_domain_id: topic.domain_id,
         exam_topic_id: topic.id,
         type: item.type,
-        source: item.type === 'flashcard' ? 'markdown_notes' : 'blueprint_gap',
+        source: item.type === 'flashcard' ? (hasScreenshotSource ? 'screenshot' : 'markdown_notes') : 'blueprint_gap',
         difficulty: item.difficulty,
         prompt: item.prompt,
         answer: item.answer ?? null,
